@@ -140,6 +140,7 @@ def start_plot(title, xlabel, ylabel, style="a:c", cm_num=13):
         ax.set_ylabel(ylabel, fontdict={'fontsize': 12})
         ax.tick_params(axis='both', which='major', labelsize=10)
     elif ("b" in style):
+        # I believe these were Alex Seaver's favorites
         ax.set_title(title, fontdict={'fontsize': 14}, y = 1.03)
         ax.set_xlabel(xlabel, fontdict={'fontsize': 12})
         ax.set_ylabel(ylabel, fontdict={'fontsize': 12})
@@ -320,7 +321,7 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
 ##################################################### Plotting Calcs #####################################################
 ##########################################################################################################################
 
-# Limits the data of a dataframe. Good to use before calcs. Also, when plotting after data that's been passed through this, 
+# Limits the data of a dataframe. Good to use before calcs. Also, when plotting data that's been passed through this, 
 # matplotlib will adjust its y to fit your new data, which it won't always do using the intended xlimit function.
 def limit_data(df, column_name, start=None, end=None):
     # This honestly doesn't need to be a function, barely saves any lines of code. I just don't like the pandas syntax.

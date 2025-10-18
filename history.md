@@ -21,6 +21,7 @@ Code was developed in the following order. Since format and functionality is con
 1. PTAT_Current_Reference
     - Sweep and trigger settings organized into functions by "leader" and "follower"
     - "Continue Experiment" functionality added
+    - Experiment naming was expanded into an attribute-based system, moved to ICASL.py
 1. Constant-IC_Current_Reference
 1. TI-RLDO (just sims)
     - Plotted sims with ICASL.py
