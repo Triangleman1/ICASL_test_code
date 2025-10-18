@@ -100,6 +100,7 @@ import math                       # Does math
 import collections                # I use this to check whether input to a function is a collection (list,array,etc.)
 import matplotlib.legend as lg    # I use this to check whether input to a function is a matplotlib legend
 from datetime import date         # Read current date
+from matplotlib.ticker import MultipleLocator, LogLocator # Used for ticks in linear and logarithmic plots
 
 def test():
     print("ICASL is loaded!")
@@ -129,46 +130,102 @@ def read_csv(path):
         print("ICASL.read_csv() may not yet account for this encoding scheme.")
         raise UnicodeDecodeError()
 
-# Apply default parameters that are shared by all plots. Any property can be changed afterwards if needed.
-def start_plot(title, xlabel, ylabel, style="a:c", cm_num=13):
-    fig, ax = plt.subplots(layout='constrained')
+# Creates plot, title, labels, and applies styling. Various presets can be applied by adding specific characters to the "style"
+# string. All of these properties can be changed after this function runs if you still need to tweak something.
+# Style Modifiers:
+# b -- bigger text
+# bb -- bigger text, title very large and bold
+# alex -- sleek, thin. Includes major and minor dashed grid lines, which are the same width
+# nt -- no title
+# nxm -- no x margin. Adds back the horizontal space between the ends of lines and the sides of the plot, which this removes by default
+# ng -- no grid
+# 1x2 -- stacks two plots on top of each other (i.e. for bode plots)
+# log1 -- logarithmic x-axis, major and minor grid lines. Major are thicker. Good for bode plots.
+# c -- colors cm_num lines using cm (default: gist_rainbow). Not really useful, this happens anyways when you specify a cm_num.
+# If these styles contradict, the properties chosen will simply be those that appear later in code. The "no" modifiers have priority.
+def start_plot(title, xlabel, ylabel, style="a:c", figsize=(6.4,4.8), cm=plt.get_cmap('gist_rainbow'), cm_num="default"):
     
-    # Text and tick settings
+    style = clean_styling_string(style)
+
+    # Determine from style if this is a bode plot
+    bode = False
+    if "1x2" in style: bode = True
+
+    # Create one axis or two axes
+    if bode == False:
+        fig, ax = plt.subplots(layout='constrained', figsize=figsize)
+        axes = [ax]
+    if bode == True:
+        fig, (ax_gain, ax_phase) = plt.subplots(nrows=2, ncols=1, figsize=figsize, sharex=True, layout='constrained')
+        axes = [ax_gain, ax_phase]
+
+    # Generate arguments that both single axis and multi-axes plots can use
+    title_args = {} # These empty dictionaries act as defaults.
+    xlabel_args = {}
+    ylabel_args = {}
+    tick_args = {}
+    major_grid_args = {}
+    minor_grid_args = {}
+    xmargin_args = {"x":0}
     if ("bb" in style): # Bigger & bolder text
-        ax.set_title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'}, y = 1.03)
-        ax.set_xlabel(xlabel, fontdict={'fontsize': 12})
-        ax.set_ylabel(ylabel, fontdict={'fontsize': 12})
-        ax.tick_params(axis='both', which='major', labelsize=10)
-    elif ("b" in style):
-        # I believe these were Alex Seaver's favorites
-        ax.set_title(title, fontdict={'fontsize': 14}, y = 1.03)
-        ax.set_xlabel(xlabel, fontdict={'fontsize': 12})
-        ax.set_ylabel(ylabel, fontdict={'fontsize': 12})
-        ax.tick_params(axis='both', which='major', labelsize=10)
-    else:
-        # Matplotlib defaults
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-
-    # Color settings
-    # Finish_plot() does this as well, with requiring a cm_num. But that function's not as intuitive to use overall.
-    if ("c" in style):
-        cm=plt.get_cmap('gist_rainbow')
-        ax.set_prop_cycle('color', cm(np.linspace(0, 1, cm_num)))
-
-    # Removes margins on left/right side - lines no longer stop abruptly before edge of plot. Not always desired.
-    if ("m" in style):
-        pass
-    else:
-        ax.margins(x=0)
-
-    if ("ng" in style):
-        pass
-    else:
-        ax.grid()
+        title_args = {"fontdict":{'fontsize': 16, 'fontweight': 'bold'}, "y":1.03}
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        tick_args = {"axis":'both',"which":'major',"labelsize":10}
+    if ("b" in style): # Bigger text
+        title_args = {"fontdict":{'fontsize': 14}}
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        tick_args = {"axis":'both',"which":'major',"labelsize":10}
+    if ("alex" in style): # From Alex's SiGe Op Amp Paper -- sleek and thin
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        major_grid_args = {"linestyle":'--', "linewidth":0.4}
+        minor_grid_args = {"linestyle":'--', "linewidth":0.4}
+        [x.set_linewidth(0.3) for x in ax.spines.values()] # Reduces thickness of border
     
-    return fig, ax
+    if bode == False:
+        if ("nt" not in style): ax.set_title(title, **title_args)
+        ax.set_xlabel(xlabel, **xlabel_args)
+        ax.set_ylabel(ylabel, **ylabel_args)
+        ax.tick_params(**tick_args)
+    
+    # Creates two axes and apply text parameters
+    if bode == True:
+        if ((not isinstance(ylabel, collections.abc.Iterable)) or isinstance(ylabel, str) or len(ylabel) != 2):
+            raise ValueError("ylabel must be a list of two strings if you pass a 'bode' style")
+
+        if ("nt" not in style): ax_gain.set_title(title, **title_args)
+        ax_gain.set_ylabel(ylabel[0], **ylabel_args)
+        ax_phase.set_ylabel(ylabel[1], **ylabel_args)
+        ax_phase.set_xlabel(xlabel)
+        fig.get_layout_engine().set(hspace=.08) # Sets height of space between magnitude and phase plots
+
+    if ("log1" in style):
+        major_grid_args = {"linestyle":'-', "linewidth":0.6}
+        minor_grid_args = {"linestyle":':', "linewidth":0.4}
+        for ax in axes:
+            ax.set_xscale('log')
+            ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)))
+
+    for ax in axes:
+        # Color settings
+        # Finish_plot() can do this without knowing the number of lines. start_plot() is better if you only want to apply this color scheme to a subset of lines on an axis.
+        if ("c" in style or cm_num != "default"):
+            if cm_num == "default": cm_num = 13
+            ax.set_prop_cycle('color', cm(np.linspace(0, 1, cm_num)))
+
+        # These run by default -- specifiers turn them off.
+        if ("nxm" not in style): 
+            ax.margins(**xmargin_args) # If 0, removes margins on left/right side - lines no longer stop abruptly before edge of plot.
+        if ("ng" not in style): 
+            ax.grid(which="major", **major_grid_args)
+            ax.grid(which="minor", **minor_grid_args)    
+    
+    if not bode:
+        return fig, ax
+    if bode:
+        return fig, (axes[0], axes[1])
 
 # Adds an annotation into the bottom of the legend. Centered text, legend box will expand if text is large.
 def add_legend_text(legend, text):
@@ -182,31 +239,29 @@ def add_legend_text(legend, text):
     return legend
 
 # In finish_plot(): fig and ax are POSITIONAL arguments - when calling a function, you must insert those first and 
-# in the same order. All arguments that are defined with an "=" are KEYWORD arguments - when calling the function, 
-# you write out their name, an '=', then the value for each.
-# Keyword arguments are optional. If not provided, the default values in the definition below will be assumed.
+# in the same order. All arguments that are defined with an "=" are KEYWORD arguments -- when calling the function, 
+# you write out their name, an '=', then the value for each. When calling a function, keyword arguments are optional. 
+# If not provided, the default values in the function definition's arguments will be used.
 
 # This is all the code that can only run after a plot is filled. 
 # Honestly, this one's a bit messy (despite best effort). Might not be worth learning/using?
 # Adding colors afterwards is nice - don't need to know the number beforehand. Completely abstracted away.
 # Legend_style is searched for 1-2 character sequences to determine how to construct the legend. Need to add delimiter eventually.
 def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_cmap('gist_rainbow'), 
-                legend=None, legend_style="#", annotations=None, close=True, show=False):
+                legend=None, legend_title=None, legend_style="default", annotations=None, close=True, show=False, save=True):
+    
+    # Sets legend_style to a default styling if requested
     default_style = "k:c"
-    if legend_style == "#":
+    if legend_style == "default" or legend_style == "#":
         legend_style = default_style
 
-    if isinstance(legend_style, str):
-        if (legend_style[0] != ":"):
-            legend_style = ":" + legend_style
-        if (legend_style[-1] != ":"):
-            legend_style = legend_style + ":"
+    legend_style = clean_styling_string(legend_style)
 
     # Check if there's multiple axes (left and right side)
     multi_ax = False
     if isinstance(ax, collections.abc.Iterable):
         multi_ax = True
-        axes = ax # Rename to be more sensical
+        axes = ax # Renames
 
     # Sets line color. Reads number of lines on its own
     if cm != None:
@@ -215,6 +270,7 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
             colors = cm(np.linspace(0, 1, len(lines)))
             for line, color in zip(lines, colors):
                 line.set_color(color)
+            all_lines = lines
         else:
             all_lines = []
             for a in axes:
@@ -225,42 +281,53 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
                 line.set_color(color)
 
     if legend_style == None:
-        raise ValueError("legend_style cannot be NoneType. Use 'n' to avoid all legend behavior.")
+        raise ValueError("legend_style cannot be NoneType. Use legend_style='n' to avoid all finish_plot() legend behavior.")
     
     # Legend styling. Adds a legend if you don't pass one to this function.
-    if ((legend != None or legend_style != default_style or len(lines) > 1 or annotations != None) and ":n:" not in legend_style):
+    if ((legend != None or legend_style != default_style or len(lines) > 1 or annotations != None) and "n" not in legend_style):
         if (legend == None):
+            legend_args = {}
             # Determine location
-            if ":b2:" in legend_style: bbox=(1.15, 1) # box on the right side, further right (for second axis)
-            elif ":b:" in legend_style: bbox=(1.02, 1) # box on the right side
-            else: bbox = None
+            if multi_ax == True:
+                # Move legend box out of the way if there's a second axis
+                if "b" in legend_style:
+                    legend_style = ["b2" if styling == "b" else styling for styling in legend_style]
+            if "b2" in legend_style: legend_args["bbox_to_anchor"] = (1.15, 1) # box on the right side, further right (for second axis)
+            elif "b" in legend_style: legend_args["bbox_to_anchor"] = (1.02, 1) # box on the right side
 
-            if ":ur:" in legend_style: loc = "upper right"
-            elif ":ul:" in legend_style: loc = "upper left"
-            elif ":lr:" in legend_style: loc = "lower right"
-            elif ":ll:" in legend_style: loc = "lower left"
-            else: loc = None
+            if "ur" in legend_style: legend_args["loc"] = "upper right"
+            elif "ul" in legend_style: legend_args["loc"] = "upper left"
+            elif "lr" in legend_style: legend_args["loc"] = "lower right"
+            elif "ll" in legend_style: legend_args["loc"] = "lower left"
 
-            if ":s:" in legend_style:
-                facecolor='white'
-                framealpha=1
-            else:
-                facecolor=None
-                framealpha=None
+            # Determine appearance
+            if "s" in legend_style: # solid
+                legend_args["facecolor"] = 'white'
+                legend_args["framealpha"] = 1
 
-            if ":nc2:" in legend_style: ncols = 2
-            elif ":nc3:" in legend_style: ncols = 3
-            elif ":nc4:" in legend_style: ncols = 4
-            else: ncols = 1
+            # Could use regex to make this more dynamic
+            if "2c" in legend_style: legend_args["ncols"] = 2
+            elif "3c" in legend_style: legend_args["ncols"] = 3
+            elif "4c" in legend_style: legend_args["ncols"] = 4
 
-            # Set legend
+            if legend_title != None:
+                legend_args["title"] = legend_title
+
+            if "alex" in legend_style:
+                legend_args["fontsize"] = 12 # I think this fontsize is default?
+                legend_args["title_fontsize"] = 14
+                legend_args["markerscale"] = 12
+
+            # Sets legend
             if multi_ax == False:
+                # For one axis
                 lines, labels = ax.get_legend_handles_labels()
                 if len(lines) == 1: # If there's only one line, I assume you don't actually want legend entries, and are going to glue annotations on later.
                     lines = []
                     labels = []
-                legend = ax.legend(lines, labels, loc=loc, bbox_to_anchor=bbox, facecolor=facecolor, framealpha=framealpha, ncols=ncols)
+                legend = ax.legend(lines, labels, **legend_args)
             else:
+                # For two axes
                 all_lines = []
                 all_labels = []
                 for a in axes:
@@ -272,17 +339,17 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
                 if len(all_lines) == 1:
                     all_lines = []
                     all_labels = []
-                legend = axes[0].legend(all_lines, all_labels, loc=loc, bbox_to_anchor=bbox, facecolor=facecolor, framealpha=framealpha, ncols=ncols)
+                legend = axes[0].legend(all_lines, all_labels, **legend_args)
                 
         elif (not isinstance(legend, lg.Legend)):
             raise ValueError(f"legend is of invalid type {type(legend)}. It should be the object that ax.legend() returns.")
         # Style legend lines
-        if (":k:" in legend_style): # Thickens widths of the legend's example lines, NOT the actual lines on the plot
+        if ("k" in legend_style): # Thickens widths of the legend's example lines, NOT the actual lines on the plot
             for legend_line in legend.get_lines(): 
                 legend_line.set_linewidth(2.5)
-        if (":c:" in legend_style): # Colors legend lines the same as actual lines
+        if ("c" in legend_style): # Colors legend lines the same as actual lines
             if cm != None:
-                for legend_line, color in zip(legend.get_lines(), colors):
+                for legend_line, color in zip(legend.get_lines(), cm(np.linspace(0, 1, len(all_lines)))):
                     legend_line.set_color(color)
     
     # Adds annotations to legend (an organized way to place them, little funky though.)
@@ -296,20 +363,22 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
             print("Error: Improper type for 'annotations'. Should be either a string or a collection of strings.")
     
     # Saves and/or shows
-    if (save_dir == "None" and save_file != "None"):
-        print("Warning: You specified a save_file but not a save_dir. Figure not saved.")
+    if (save == False):
+        pass
+    elif (save_dir == "none" and save_file != "none"):
+        print("Warning: You specified a save_file but not a save_dir. Figure can not be saved.")
         show = True
-    if (save_dir != "None" and save_file == "None"):
-        print("Warning: You specified a save_dir but not a save_file. Figure not saved.")
+    elif (save_dir != "none" and save_file == "none"):
+        print("Warning: You specified a save_dir but not a save_file. Figure can not be saved.")
         show = True
-    elif (save_dir != "None" and save_file != "None"):
+    elif (save_dir != "none" and save_file != "none"):
         os.makedirs(save_dir, exist_ok=True)
         if os.path.isdir(save_dir):
             fig.savefig(os.path.join(save_dir, save_file), dpi=dpi)
         else:
             raise ValueError("Directory provided ({save_dir}) does not exist. Figure not saved.")
     else:
-        show = True # If you don't save the figure, shows plot regardless of if you ask it to
+        show = True # If figure fails to save, shows plot regardless of if you ask it to
     if (show):
         plt.show()
     
@@ -635,6 +704,23 @@ def fix_dataframe(df):
     # df = df[df[df.columns[0]].str.strip().astype(bool)] # Clears empty rows and whitespace rows
     # df = convert_to_num(df) # Convert back to either ints or floats - decides which.
     return df
+
+# Splits a delimited string. Used for styling specifiers in plotting functions.
+def clean_styling_string(style):
+    # Any of the following delimiters can be used inside style. Internally, all are replaced with a colon.
+    delimiters = "~`!@#$%^&*-_=+\\/|;'<>,./?"
+    for delimiter in delimiters:
+        style = style.replace(delimiter, ":")
+    
+    # Lowercase any capital letters for case-insensitivity
+    style = style.lower()
+
+    # Style is split from a delimited string into an array of strings
+    if isinstance(style, str):
+        style = style.split(":")
+    style = [s for s in style if s!=""] # removes empty strings
+    style = list(set(style)) # removes duplicates
+    return style
 
 # Sorts, removes duplicates, converts to either floats or ints depending on precision, rounds off imprecision.
 def clean_list(listA, quiet=True):
