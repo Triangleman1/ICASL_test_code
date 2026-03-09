@@ -407,6 +407,10 @@ def limit_data(df, column_name, start=None, end=None):
 def tran_peak(times, values, settling_direction, log=False):
     if (settling_direction.lower() in ["up", "rising"]): peak_value = min(values)
     elif (settling_direction.lower() in ["down", "falling"]): peak_value = max(values)
+
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
     peak_time = times[np.where(values == peak_value)[0]][0]
     if log:
         print(f"Peak Time: {peak_time}")
@@ -416,6 +420,9 @@ def tran_peak(times, values, settling_direction, log=False):
 # Determines coordinates where transient is officially settled
 # Limit data to only show one transient step response before calling
 def tran_settle(times, values, peak_value, percent_settling_threshold, log=False):
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
     settled_value = np.mean(values[-3:-1])
     threshold = abs(peak_value*percent_settling_threshold/100)
     # These are the indices of every piece of data whose y value is not within the settled threshold
@@ -444,11 +451,15 @@ def tran_settle(times, values, peak_value, percent_settling_threshold, log=False
 # Determines coordinates where transient first begins
 # Limit data to only show one transient step response before calling
 # Works best with interpolation. Won't work at all if you have less than [std_width] points in the starting, settled region of your data.
-def tran_start(times, values, log=False, std_width=10):
+def tran_start(times, values, log=False, std_width=10, drop_distance=1):
     # I thought it'd be fun to detect the start of transients (although uneccesary, usually already known) -- I trace through each time step, 
     # finding the standard deviation shortly before and after, then take a ratio of those two stds. This ratio is within 20 and .05 everywhere 
     # except around start of the transient, where it spikes to the 1,000's (with interpolation, stays within 5 and .2 and spikes to 1,000,000s)
-    # To find the exact point where the transient begins, I find the maximum drop in this ratio from one time step to the next. Works so far.
+    # To find the exact point where the transient begins, I find the maximum drop in this ratio from one time step to the next (if drop distance
+    # equals 1) For noisy data with a lot of datapoints, may need to increase drop_distance a little.
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
     std_ratios = []
     drops = []
     if (len(values) < std_width*2+1):
@@ -464,7 +475,7 @@ def tran_start(times, values, log=False, std_width=10):
             future_std = np.std(values[i:i+std_width])
             std_ratio = future_std/past_std
             std_ratios.append(std_ratio)
-            drops.append(std_ratios[i-1]/std_ratios[i])
+            drops.append(std_ratios[i-drop_distance]/std_ratios[i])
             if log: print(f"Index {i} : Time {time}: Value {value} : Ratio {future_std/past_std}")
         starting_time = times[drops.index(max(drops))-2]
         starting_value = values[np.where(times == starting_time)[0]][0]
@@ -697,6 +708,12 @@ def convert_to_num(input):
             return float(input)
     else:
         raise ValueError(f"Unsupported Type: {type(input)}")
+
+def convert_to_numpy(input):
+    if isinstance(input, pd.Series):
+        return input.values
+    else:
+        return input
 
 def fix_dataframe(df):
     df = df.dropna(how='all')
