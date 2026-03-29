@@ -1,60 +1,20 @@
 # Collection of functions for plotting, testing, and working with multidimensional data. 
+# Use the outline in the bottom left (VScode) to navigate functions. Press "Collapse all" in top right of that menu.
+
+######### Importing #########
 # Copy/paste the functions you want, or import the file into your code and write ICASL.example_function() to call them.
 # Two ways to import:
 # 1) Move into the same directory as your code and write "import ICASL" at top
 # 2) Move into any higher directory than your code and copy/paste the commented out section of code below. I'll likely
-#    place this somewhere high up in the Sharepoint eventually
-#
-# Use the outline in the bottom left (VScode) to navigate functions. Press "Collapse all" in top right of it.
-# The most useful functions are:
-#
-# arange() - performs numpy.arange(), but fixes many of the bugs and stupid behavior in it.
-# start_plot() - Applies default plotting settings. Styles built-in to choose from, can add more.
-# add_legend_text() - Adds an annotation to the bottom of the legend. Clean/organized way to add multiple of them.
-# finish_plot() - Saves, shows, closes, colors lines, applies legend styling, adds annotations.
-# scale() - Scales a list of nums such that the highest is between 1-999 (useful for Engineering Notation)
-# prefix() - Returns the corresponding Engineering Notation prefix, when provided an unscaled list
-# set_precision() - Pass an element, and a list it belongs to. Returns with trailing zeros. Makes file names sort better.
-# execute_cells_by_tag() - Runs all cells in a jupyter notebook with a given tag. Allows for running cells in groups. 
-#                          (Must copy/paste into your own code)
-# 
-# There are two types of csv input formats we often need to plot. I refer to them in this code as:
-# 1) Tree (Tests). Branching directories, each named for a constant value of a sweep variable (temp=100), which end in 
-# multiple csv files, also named for a constant value (VREF=.8), which contain 2D data within.
-# 2) Cadence (Sims). Virtuoso's default csv format is to stack 2 column data horizontally into one big file, embedding the 
-#    constant values for each simulation within the metadata of the header cells. Harder to write code for.
-#
-# The rest of these functions are designed to provide either conversion or dual functionality between these two formats.
-# Whether using them is worth the learning curve is debatable. AI is already good enough to do most of our plotting for us.
-# They are:
-# reformat() - Converts a Cadence csv into a tree structure of 2-column csv files
-# read_cadence_csv() - Reads a cadence-style csv into a tree of dictionaries, an easy data structure for plotting
-# read_tree_csv() - Reads a tree of directories into a tree of dictionaries, an easy data structure for plotting
-# read_tree_names() - Reads names of constants that were swept (temp, VREF) from a tree of directories. Makes assumptions.
-# read_cadence_metadata_names() - Reads names of constants that were swept (temp, VREF) from a cadence csv's metadata
-# read_tree_values() - Reads swept values of constants from directory tree
-# read_cadence_values() - Reads swept values of constants from cadence csv file
-
-# Most other functions are simply meant to be used internally by other functions. Don't bother looking at them.
-
-import matplotlib.pyplot as plt   # Plotting graphs and visualizing data
-import matplotlib.offsetbox as ob # An internal Matplotlib data structure. Used for cleaner annotations.
-import numpy as np                # Numerical operations, particularly with arrays
-import os                         # Interact with the operating system, such as handling file paths
-import pandas as pd               # Intuitive labeled 2D data
-import os                         # Interface with Operating System
-import re                         # Regular expressions for text searching
-import math                       # Does math
-import collections                # I use this to check whether input to a function is a collection (list,array,etc.)
-import matplotlib.legend as lg    # I use this to check whether input to a function is a matplotlib legend
-from datetime import date         # Read current date
+#    place this file somewhere high up in the Sharepoint, or properly publish as a python package
 
 # Copy, paste, and uncomment (ctrl+/) the following into a python/jupyter file to load these functions from any higher 
 # directory that contains ICASL.py
-######################################################################
+###
+# Loads ICASL.py from a higher directory
 # import os
 # import importlib.util
-# quiet = True
+# quiet=True
 # current_dir = "."
 # target_file = "ICASL.py"
 # target_name = "ICASL"
@@ -68,16 +28,79 @@ from datetime import date         # Read current date
 #         spec = importlib.util.spec_from_file_location(target_name, ICASL_path)
 #         ICASL = importlib.util.module_from_spec(spec)
 #         spec.loader.exec_module(ICASL)
+#         break
 #     else:
 #         # Move one level up
-#         parent_dir = os.path.dirname(current_dir)
+#         parent_dir = os.path.join(current_dir, "..")
 #         if not quiet: print(parent_dir)
 #         if current_dir == parent_dir:  # Reached the root directory
 #             raise ValueError("ICASL.py not found")
 #         else:
 #             current_dir = parent_dir
-# ICASL.test() 
-#######################################################################
+# ICASL.test()
+###
+
+######### Summary of Functions #########
+# arange() - performs numpy.arange(), but fixes many of the bugs and stupid behavior in it.
+# read_csv() - performs pandas.read_csv(), but adjusts for utf-16 encoding when needed.
+
+### Plotting ###
+# start_plot() - Applies default plotting settings. Styles built-in to choose from, can add more.
+# add_legend_text() - Adds an annotation to the bottom of the legend. Clean/organized way to add multiple of them.
+# finish_plot() - Saves, shows, closes, colors lines, applies legend styling, adds annotations.
+
+### Calcs ###
+# limit_data() - Removes dataframe data outside of a high and/or low range for a particular column
+# tran_peak(), tran_settle(), tran_start() - find useful points in transient response (can be used for settling time and delta_V)
+# find_closest() - find closest value in a list
+# convert_from_decibels()
+# calc_gain_margin()
+# calc_phase_margin()
+# calc_gain_bandwidth()
+# calc_crossover_freq()
+
+### Presentation ###
+# scale() - Scales a list of nums such that the highest is between 1-999 (useful for Engineering Notation)
+# scale_by() - performs scale(), but uses a different list as a reference for determining precision. Consistency across multiple lines.
+# prefix() - Returns the corresponding Engineering Notation prefix, when provided an unscaled list
+# set_precision() - Pass an element, and a list it belongs to. Returns element with proper trailing zeros. Makes file names sort better.
+
+### Testing ###
+# execute_cells_by_tag() - Allows for running cells in groups. (Can't call, must copy/paste)
+# generate_experiment_name() - Makes folder name for experiment. Attribute-based. Adds [No_Plots] attribute by default.
+# rename_dir_once_plotted() - Removes attribute (such as [No_Plots])
+
+### Reading in data ###
+# There are two types of csv input formats we often need to plot. I refer to them in this code as:
+# 1) Tree (Tests). Branching directories, each named for a constant value of a sweep variable (temp=100), which end in 
+# multiple csv files, also named for a constant value (VREF=.8), which contain 2-column data within.
+# 2) Cadence (Sims). Virtuoso's default csv format is to stack 2 column data horizontally into one big file, embedding the 
+#    constant values for each simulation within the metadata of the header cells. Harder to write code for.
+# The rest of these functions are designed to provide either conversion or dual functionality between these two formats.
+# Whether using them is worth the learning curve is debatable. AI is already good enough to do most of our plotting for us.
+# They are:
+# reformat() - Converts a cadence csv into a tree structure of 2-column csv files
+# read_cadence_csv() - (USEFUL!!!) Reads a cadence-style csv into a tree of dictionaries, an easy data structure for plotting
+# read_tree_csv() - Reads a tree of directories into a tree of dictionaries
+# read_tree_names() - Reads names of constants that were swept (temp, VREF) from a tree of directories. Makes assumptions.
+# read_cadence_metadata_names() - Reads names of constants that were swept (temp, VREF) from a cadence csv's metadata
+# read_tree_values() - Reads swept values of constants from directory tree
+# read_cadence_values() - Reads swept values of constants from cadence csv file
+
+# Most other functions are simply meant to be used internally by other functions. Don't bother looking at all of these.
+
+import matplotlib.pyplot as plt   # Plotting graphs and visualizing data
+import matplotlib.offsetbox as ob # An internal Matplotlib data structure. Used for cleaner annotations.
+import numpy as np                # Numerical operations, particularly with arrays
+import os                         # Interact with the operating system, such as handling file paths
+import pandas as pd               # Intuitive labeled 2D data
+import os                         # Interface with Operating System
+import re                         # Regular expressions for text searching
+import math                       # Does math
+import collections                # I use this to check whether input to a function is a collection (list,array,etc.)
+import matplotlib.legend as lg    # I use this to check whether input to a function is a matplotlib legend
+from datetime import date         # Read current date
+from matplotlib.ticker import MultipleLocator, LogLocator # Used for ticks in linear and logarithmic plots
 
 def test():
     print("ICASL is loaded!")
@@ -93,41 +116,116 @@ def arange(start, stop, step, adjustment=1e-12):
     listA = [float(round(element, 12)) for element in listA]
     return listA
 
+# Adjusts for utf-16 encoding when needed
 def read_csv(path):
     try:
         df = pd.read_csv(path, encoding='utf-8')
+        return df
     except UnicodeDecodeError:
+        pass
+    try:
         df = pd.read_csv(path, encoding='utf-16')
-    return df
+        return df
+    except UnicodeDecodeError:
+        print("ICASL.read_csv() may not yet account for this encoding scheme.")
+        raise UnicodeDecodeError()
 
-
-# Apply default parameters that are shared by all plots. Any property can be changed afterwards if needed.
-def start_plot(title, xlabel, ylabel, style="a", cm_num=13):
-    fig, ax = plt.subplots(layout='constrained')
+# Creates plot, title, labels, and applies styling. Various presets can be applied by adding specific characters to the "style"
+# string. All of these properties can be changed after this function runs if you still need to tweak something.
+# Style Modifiers:
+# b -- bigger text
+# bb -- bigger text, title very large and bold
+# alex -- sleek, thin. Includes major and minor dashed grid lines, which are the same width
+# nt -- no title
+# nxm -- no x margin. Adds back the horizontal space between the ends of lines and the sides of the plot, which this removes by default
+# ng -- no grid
+# 1x2 -- stacks two plots on top of each other (i.e. for bode plots)
+# log1 -- logarithmic x-axis, major and minor grid lines. Major are thicker. Good for bode plots.
+# c -- colors cm_num lines using cm (default: gist_rainbow). Not really useful, this happens anyways when you specify a cm_num.
+# If these styles contradict, the properties chosen will simply be those that appear later in code. The "no" modifiers have priority.
+def start_plot(title, xlabel, ylabel, style="a:c", figsize=(6.4,4.8), cm=plt.get_cmap('gist_rainbow'), cm_num="default"):
     
-    # Text, tick, and grid Settings
-    if (style == "a"): # Matplotlib defaults
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        # Removes margins on left/right side - lines no longer stop abruptly before edge of plot. Not always desired.
-        ax.margins(x=0)
-        ax.grid()
-    elif (style == "b"): # Bigger & bolder text
-        ax.set_title(title, fontdict={'fontsize': 16, 'fontweight': 'bold'}, y = 1.03)
-        ax.set_xlabel(xlabel, fontdict={'fontsize': 12})
-        ax.set_ylabel(ylabel, fontdict={'fontsize': 12})
-        ax.tick_params(axis='both', which='major', labelsize=10)
-        ax.margins(x=0)
-        ax.grid()
+    style = clean_styling_string(style)
 
-    # Color settings
-    # Finish_plot() does this as well, with requiring a cm_num. But that function's not as intuitive to use overall.
-    # if (style in "ab"):
-    #     cm=plt.get_cmap('gist_rainbow')
-    #     ax.set_prop_cycle('color', [cm(1.*i/cm_num) for i in range(cm_num)])
+    # Determine from style if this is a bode plot
+    bode = False
+    if "1x2" in style: bode = True
+
+    # Create one axis or two axes
+    if bode == False:
+        fig, ax = plt.subplots(layout='constrained', figsize=figsize)
+        axes = [ax]
+    if bode == True:
+        fig, (ax_gain, ax_phase) = plt.subplots(nrows=2, ncols=1, figsize=figsize, sharex=True, layout='constrained')
+        axes = [ax_gain, ax_phase]
+
+    # Generate arguments that both single axis and multi-axes plots can use
+    title_args = {} # These empty dictionaries act as defaults.
+    xlabel_args = {}
+    ylabel_args = {}
+    tick_args = {}
+    major_grid_args = {}
+    minor_grid_args = {}
+    xmargin_args = {"x":0}
+    if ("bb" in style): # Bigger & bolder text
+        title_args = {"fontdict":{'fontsize': 16, 'fontweight': 'bold'}, "y":1.03}
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        tick_args = {"axis":'both',"which":'major',"labelsize":10}
+    if ("b" in style): # Bigger text
+        title_args = {"fontdict":{'fontsize': 14}}
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        tick_args = {"axis":'both',"which":'major',"labelsize":10}
+    if ("alex" in style): # From Alex's SiGe Op Amp Paper -- sleek and thin
+        xlabel_args = {"fontdict":{'fontsize': 12}}
+        ylabel_args = {"fontdict":{'fontsize': 12}}
+        major_grid_args = {"linestyle":'--', "linewidth":0.4}
+        minor_grid_args = {"linestyle":'--', "linewidth":0.4}
+        [x.set_linewidth(0.3) for x in ax.spines.values()] # Reduces thickness of border
     
-    return fig, ax
+    if bode == False:
+        if ("nt" not in style): ax.set_title(title, **title_args)
+        ax.set_xlabel(xlabel, **xlabel_args)
+        ax.set_ylabel(ylabel, **ylabel_args)
+        ax.tick_params(**tick_args)
+    
+    # Creates two axes and apply text parameters
+    if bode == True:
+        if ((not isinstance(ylabel, collections.abc.Iterable)) or isinstance(ylabel, str) or len(ylabel) != 2):
+            raise ValueError("ylabel must be a list of two strings if you pass a 'bode' style")
+
+        if ("nt" not in style): ax_gain.set_title(title, **title_args)
+        ax_gain.set_ylabel(ylabel[0], **ylabel_args)
+        ax_phase.set_ylabel(ylabel[1], **ylabel_args)
+        ax_phase.set_xlabel(xlabel)
+        fig.get_layout_engine().set(hspace=.08) # Sets height of space between magnitude and phase plots
+
+    if ("log1" in style):
+        major_grid_args = {"linestyle":'-', "linewidth":0.6}
+        minor_grid_args = {"linestyle":':', "linewidth":0.4}
+        for ax in axes:
+            ax.set_xscale('log')
+            ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)))
+
+    for ax in axes:
+        # Color settings
+        # Finish_plot() can do this without knowing the number of lines. start_plot() is better if you only want to apply this color scheme to a subset of lines on an axis.
+        if ("c" in style or cm_num != "default"):
+            if cm_num == "default": cm_num = 13
+            ax.set_prop_cycle('color', cm(np.linspace(0, 1, cm_num)))
+
+        # These run by default -- specifiers turn them off.
+        if ("nxm" not in style): 
+            ax.margins(**xmargin_args) # If 0, removes margins on left/right side - lines no longer stop abruptly before edge of plot.
+        if ("ng" not in style): 
+            ax.grid(which="major", **major_grid_args)
+            ax.grid(which="minor", **minor_grid_args)    
+    
+    if not bode:
+        return fig, ax
+    if bode:
+        return fig, (axes[0], axes[1])
 
 # Adds an annotation into the bottom of the legend. Centered text, legend box will expand if text is large.
 def add_legend_text(legend, text):
@@ -141,46 +239,121 @@ def add_legend_text(legend, text):
     return legend
 
 # In finish_plot(): fig and ax are POSITIONAL arguments - when calling a function, you must insert those first and 
-# in the same order. All arguments that are defined with an "=" are KEYWORD arguments - when calling the function, 
-# you write out their name, an '=', then the value for each.
-# Keyword arguments are optional. If not provided, the default values in the definition below will be assumed.
+# in the same order. All arguments that are defined with an "=" are KEYWORD arguments -- when calling the function, 
+# you write out their name, an '=', then the value for each. When calling a function, keyword arguments are optional. 
+# If not provided, the default values in the function definition's arguments will be used.
 
 # This is all the code that can only run after a plot is filled. 
-# Honestly, this one's a bit messy (despite best effort). Might not be worth learning. 
+# Honestly, this one's a bit messy (despite best effort). Might not be worth learning/using?
 # Adding colors afterwards is nice - don't need to know the number beforehand. Completely abstracted away.
-def finish_plot(fig, ax, save_dir="none", save_file="none", cm=plt.get_cmap('gist_rainbow'), 
-                legend=None, legend_style="None", annotations=None, close=True, show=False):
-    # Sets line color
-    lines = ax.lines
+# Legend_style is searched for 1-2 character sequences to determine how to construct the legend. Need to add delimiter eventually.
+def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_cmap('gist_rainbow'), 
+                legend=None, legend_title=None, legend_style="default", annotations=None, close=True, show=False, save=True):
+    
+    # Sets legend_style to a default styling if requested
+    default_style = "k:c"
+    if legend_style == "default" or legend_style == "#":
+        legend_style = default_style
+
+    legend_style = clean_styling_string(legend_style)
+
+    # Check if there's multiple axes (left and right side)
+    multi_ax = False
+    if isinstance(ax, collections.abc.Iterable):
+        multi_ax = True
+        axes = ax # Renames
+
+    # Sets line color. Reads number of lines on its own
     if cm != None:
-        colors = cm(np.linspace(0, 1, len(lines)))
-        for line, color in zip(lines, colors):
-            line.set_color(color)
+        if multi_ax == False:
+            lines = ax.lines
+            colors = cm(np.linspace(0, 1, len(lines)))
+            for line, color in zip(lines, colors):
+                line.set_color(color)
+            all_lines = lines
+        else:
+            all_lines = []
+            for a in axes:
+                for line in a.lines:
+                    all_lines.append(line)
+            colors = cm(np.linspace(0, 1, len(all_lines)))
+            for line, color in zip(all_lines, colors):
+                line.set_color(color)
+
+    if legend_style == None:
+        raise ValueError("legend_style cannot be NoneType. Use legend_style='n' to avoid all finish_plot() legend behavior.")
     
     # Legend styling. Adds a legend if you don't pass one to this function.
-    if (legend != None or legend_style != "None" or len(lines) > 1):
+    if ((legend != None or legend_style != default_style or len(lines) > 1 or annotations != None) and "n" not in legend_style):
         if (legend == None):
-            # If you don't pass a legend but request a style, I put it in a box on the right side
-            #legend = ax.legend(bbox_to_anchor=(1.02, 1))
-            legend = ax.legend()
+            legend_args = {}
+            # Determine location
+            if multi_ax == True:
+                # Move legend box out of the way if there's a second axis
+                if "b" in legend_style:
+                    legend_style = ["b2" if styling == "b" else styling for styling in legend_style]
+            if "b2" in legend_style: legend_args["bbox_to_anchor"] = (1.15, 1) # box on the right side, further right (for second axis)
+            elif "b" in legend_style: legend_args["bbox_to_anchor"] = (1.02, 1) # box on the right side
+
+            if "ur" in legend_style: legend_args["loc"] = "upper right"
+            elif "ul" in legend_style: legend_args["loc"] = "upper left"
+            elif "lr" in legend_style: legend_args["loc"] = "lower right"
+            elif "ll" in legend_style: legend_args["loc"] = "lower left"
+
+            # Determine appearance
+            if "s" in legend_style: # solid
+                legend_args["facecolor"] = 'white'
+                legend_args["framealpha"] = 1
+
+            # Could use regex to make this more dynamic
+            if "2c" in legend_style: legend_args["ncols"] = 2
+            elif "3c" in legend_style: legend_args["ncols"] = 3
+            elif "4c" in legend_style: legend_args["ncols"] = 4
+
+            if legend_title != None:
+                legend_args["title"] = legend_title
+
+            if "alex" in legend_style:
+                legend_args["fontsize"] = 12 # I think this fontsize is default?
+                legend_args["title_fontsize"] = 14
+                legend_args["markerscale"] = 12
+
+            # Sets legend
+            if multi_ax == False:
+                # For one axis
+                lines, labels = ax.get_legend_handles_labels()
+                if len(lines) == 1: # If there's only one line, I assume you don't actually want legend entries, and are going to glue annotations on later.
+                    lines = []
+                    labels = []
+                legend = ax.legend(lines, labels, **legend_args)
+            else:
+                # For two axes
+                all_lines = []
+                all_labels = []
+                for a in axes:
+                    lines, labels = a.get_legend_handles_labels()
+                    for line in lines:
+                        all_lines.append(line)
+                    for label in labels:
+                        all_labels.append(label)
+                if len(all_lines) == 1:
+                    all_lines = []
+                    all_labels = []
+                legend = axes[0].legend(all_lines, all_labels, **legend_args)
+                
         elif (not isinstance(legend, lg.Legend)):
-            raise ValueError(f"legend is of invalid type {type(legend)}. It should the object that ax.legend() returns.")
-        # Style legend
-        if (legend_style == "None"):
-            # If you pass your legend but not a style, I default to this one
-            legend_style = "b"
-        if (legend_style == "a"):
-            pass
-        elif (legend_style == "b"):
+            raise ValueError(f"legend is of invalid type {type(legend)}. It should be the object that ax.legend() returns.")
+        # Style legend lines
+        if ("k" in legend_style): # Thickens widths of the legend's example lines, NOT the actual lines on the plot
             for legend_line in legend.get_lines(): 
-                # Thickens widths of the legend's example lines, NOT the actual lines on the plot
                 legend_line.set_linewidth(2.5)
+        if ("c" in legend_style): # Colors legend lines the same as actual lines
             if cm != None:
-                for legend_line, color in zip(legend.get_lines(), colors):
+                for legend_line, color in zip(legend.get_lines(), cm(np.linspace(0, 1, len(all_lines)))):
                     legend_line.set_color(color)
     
-    # Adds annotations to legend
-    if (annotations != None):
+    # Adds annotations to legend (an organized way to place them, little funky though.)
+    if (annotations != None and legend != None):
         if isinstance(annotations, str):
             legend = add_legend_text(legend, annotations)
         elif isinstance(annotations, collections.abc.Iterable):
@@ -190,26 +363,165 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", cm=plt.get_cmap('gis
             print("Error: Improper type for 'annotations'. Should be either a string or a collection of strings.")
     
     # Saves and/or shows
-    if (save_dir == "None" and save_file != "None"):
-        print("Warning: You specified a save_file but not a save_dir. Figure not saved.")
+    if (save == False):
+        pass
+    elif (save_dir == "none" and save_file != "none"):
+        print("Warning: You specified a save_file but not a save_dir. Figure can not be saved.")
         show = True
-    if (save_dir != "None" and save_file == "None"):
-        print("Warning: You specified a save_dir but not a save_file. Figure not saved.")
+    elif (save_dir != "none" and save_file == "none"):
+        print("Warning: You specified a save_dir but not a save_file. Figure can not be saved.")
         show = True
-    elif (save_dir != "None" and save_file != "None"):
+    elif (save_dir != "none" and save_file != "none"):
         os.makedirs(save_dir, exist_ok=True)
         if os.path.isdir(save_dir):
-            fig.savefig(os.path.join(save_dir, save_file))
+            fig.savefig(os.path.join(save_dir, save_file), dpi=dpi)
         else:
             raise ValueError("Directory provided ({save_dir}) does not exist. Figure not saved.")
     else:
-        show = True # If you don't save the figure, shows plot regardless of if you ask it to
+        show = True # If figure fails to save, shows plot regardless of if you ask it to
     if (show):
         plt.show()
     
     # Closes
     if (close):
         plt.close(fig) # Saves memory, gets rid of warnings.
+
+##########################################################################################################################
+##################################################### Plotting Calcs #####################################################
+##########################################################################################################################
+
+# Limits the data of a dataframe. Good to use before calcs. Also, when plotting data that's been passed through this, 
+# matplotlib will adjust its y to fit your new data, which it won't always do using the intended xlimit function.
+def limit_data(df, column_name, start=None, end=None):
+    # This honestly doesn't need to be a function, barely saves any lines of code. I just don't like the pandas syntax.
+    if start == None and end == None:
+        print("Warning: No reason to use limit data with no start or end limit")
+    if start != None:
+        df = df[df[column_name] > start]
+    if end != None:
+        df = df[df[column_name] < end]
+    return df
+
+# Determines coordinates of peak
+# Limit data to only show one transient step response before calling
+def tran_peak(times, values, settling_direction, log=False):
+    if (settling_direction.lower() in ["up", "rising"]): peak_value = min(values)
+    elif (settling_direction.lower() in ["down", "falling"]): peak_value = max(values)
+
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
+    peak_time = times[np.where(values == peak_value)[0]][0]
+    if log:
+        print(f"Peak Time: {peak_time}")
+        print(f"Peak Value: {peak_value}")
+    return peak_time, peak_value
+
+# Determines coordinates where transient is officially settled
+# Limit data to only show one transient step response before calling
+def tran_settle(times, values, peak_value, percent_settling_threshold, log=False):
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
+    settled_value = np.mean(values[-3:-1])
+    threshold = abs(peak_value*percent_settling_threshold/100)
+    # These are the indices of every piece of data whose y value is not within the settled threshold
+    unsettled_indices = np.where(np.logical_or(values > settled_value+threshold, values < settled_value-threshold))[0]
+    if len(unsettled_indices) == 0: 
+        print("Error: Signal is always settled.")
+        settled_time = times[0]
+    else:
+        last_unsettled_time = times[unsettled_indices[-1]]
+        if log: print(f"Last Unsettled Time: {last_unsettled_time}")
+        if times[-1] != last_unsettled_time:
+            settled_time = times[unsettled_indices[-1]+1] # If your data range is too narrow and signal is oscillating, this may run while unsettled.
+        else:
+            print("Warning: Not settled by final time")
+            settled_time = times[-1]
+    if log:
+        print(f"Settled Value: {settled_value}")
+        print(f"Unsettled Indices: {unsettled_indices}")
+        print(f"Unsettled Times: {times[unsettled_indices]}")
+        print(f"Unsettled Values: {values[unsettled_indices]}")
+        print(f"Within Threshold Times: {np.array([x for x in times if x not in times[unsettled_indices]])}")
+        print(f"Within Threshold Values: {np.array([x for x in values if x not in values[unsettled_indices]])}")
+        print(f"Settled Time: {settled_time}")
+    return settled_time, settled_value
+
+# Determines coordinates where transient first begins
+# Limit data to only show one transient step response before calling
+# Works best with interpolation. Won't work at all if you have less than [std_width] points in the starting, settled region of your data.
+def tran_start(times, values, log=False, std_width=10, drop_distance=1):
+    # I thought it'd be fun to detect the start of transients (although uneccesary, usually already known) -- I trace through each time step, 
+    # finding the standard deviation shortly before and after, then take a ratio of those two stds. This ratio is within 20 and .05 everywhere 
+    # except around start of the transient, where it spikes to the 1,000's (with interpolation, stays within 5 and .2 and spikes to 1,000,000s)
+    # To find the exact point where the transient begins, I find the maximum drop in this ratio from one time step to the next (if drop distance
+    # equals 1) For noisy data with a lot of datapoints, may need to increase drop_distance a little.
+    times=convert_to_numpy(times)
+    values=convert_to_numpy(values)
+
+    std_ratios = []
+    drops = []
+    if (len(values) < std_width*2+1):
+        print(f"Error: only {len(values)} data points. Cannot compute tran_start calculation.")
+        starting_time = 0
+        starting_value = 0
+    else:
+        for i, value, time in zip(range(len(values)), values, times):
+            if (i < std_width or i+std_width >= len(values)): std_ratios.append(1) ; drops.append(1) ; continue
+            if (values[i-std_width] == values[i-std_width+1]): std_ratios.append(1) ; drops.append(1) ; continue
+            if (values[i+std_width] == values[i+std_width-1]): std_ratios.append(1) ; drops.append(1) ; continue
+            past_std = np.std(values[i-std_width:i])
+            future_std = np.std(values[i:i+std_width])
+            std_ratio = future_std/past_std
+            std_ratios.append(std_ratio)
+            drops.append(std_ratios[i-drop_distance]/std_ratios[i])
+            if log: print(f"Index {i} : Time {time}: Value {value} : Ratio {future_std/past_std}")
+        starting_time = times[drops.index(max(drops))-2]
+        starting_value = values[np.where(times == starting_time)[0]][0]
+    if log:
+        print(f"Starting Value: {starting_value}")
+        print(f"Starting Time: {starting_time}")
+    return starting_time, starting_value
+
+def find_closest(listA, target):
+    return min(listA, key=lambda x: abs(x - target)) # Minimum of difference between a value and every value in a list -- finds closest value
+
+def convert_from_decibels(dB):
+    return 10**(dB/20)
+
+# Assumes gains and phases are perfectly aligned -- would need to use frequency as a middleman otherwise
+def calc_gain_margin(gains, phases, log=False):
+    inverted_phase = find_closest(phases, phases[0]-180)
+    gain_reference = gains[phases == inverted_phase]
+    gain_margin = 0-gain_reference
+    if log: print(f"Gain Margin: {gain_margin}")
+    return gain_margin
+
+# Assumes gains and phases are perfectly aligned
+def calc_phase_margin(gains, phases, log=False):
+    zero_gain = find_closest(gains, 0)
+    phase_reference = phases[gains == zero_gain]-phases[0]
+    phase_margin = (phase_reference+180)
+    if log: print(f"Phase Margin: {phase_margin}")
+    return phase_margin
+
+# Provide a frequency solidly on the one pole rolloff
+def calc_gain_bandwidth(freqs, gains, test_frequency, log=False):
+    freq = find_closest(freqs, test_frequency)
+    GB = convert_from_decibels(gains[freqs == freq]) * freq
+    if log: print(f"Gain Bandwidth: {GB} (Hz)")
+    return GB
+
+# This might always be the preferred method of finding GB - not sure.
+def calc_crossover_freq(freqs, gains):
+    zero_gain = find_closest(gains, 0)
+    crossover_freq = freqs[gains == zero_gain]
+    return crossover_freq
+
+###########################################################################################################################
+################################################## Plotting Presentation ##################################################
+###########################################################################################################################
 
 # Determine the appropriate scaling for generated plots in Engineering Notation
 def scale(list):
@@ -282,6 +594,10 @@ def set_precision(imprecise_element, list):
     imprecise_element = float(imprecise_element)
     return f"{imprecise_element:.{determine_precision(list)}f}"
 
+##########################################################################################################################
+###################################################### Experimental ######################################################
+##########################################################################################################################
+
 def execute_cells_by_tag(group_tag):
     # Placeholder for outline. Actual code is below. 
     pass
@@ -346,6 +662,25 @@ def generate_experiment_name(run_type, local_temps, device_name, info = ""):
     return run_dir
     # If the directory already exists, it won't raise an error due to exist_ok=True
 
+def remove_attribute(run_dir, remove_attribute):
+    # Removes string from a string. Assumes the string is surrounded by square brackets. Designed for my [attribute] naming convention.
+    # Primarily used to remove the attribute "No_Plots" from the names of run directories once plots are added.
+    try:
+        if not isinstance(remove_attribute, str): remove_attribute = str(remove_attribute)
+        if remove_attribute[0] == "[": remove_attribute = remove_attribute[1:]
+        if remove_attribute[-1] == "]": remove_attribute = remove_attribute[0:-1]
+        if f"[{remove_attribute}]" in run_dir:
+            new_run_dir = run_dir.replace(f"[{remove_attribute}]", "")
+            if new_run_dir[-1] == "_":
+                new_run_dir = new_run_dir[0:-1]
+            os.rename(run_dir, new_run_dir)
+            run_dir = new_run_dir
+            return run_dir
+    except PermissionError:
+        # Operating System might get mad if you have the directory open and try to rename. This simply moves on if it does.
+        pass
+
+# Identical to the previous function -- left here for backwards compatibility.
 def rename_dir_once_plotted(run_dir, remove_attribute):
     # Changes name of run directory once some plots are in it.
     try:
@@ -393,12 +728,35 @@ def convert_to_num(input):
     else:
         raise ValueError(f"Unsupported Type: {type(input)}")
 
+def convert_to_numpy(input):
+    if isinstance(input, pd.Series):
+        return input.values
+    else:
+        return input
+
 def fix_dataframe(df):
     df = df.dropna(how='all')
     # df = df.astype(str) # Converts all to strings. Next line will throw an error if they're not. 
     # df = df[df[df.columns[0]].str.strip().astype(bool)] # Clears empty rows and whitespace rows
     # df = convert_to_num(df) # Convert back to either ints or floats - decides which.
     return df
+
+# Splits a delimited string. Used for styling specifiers in plotting functions.
+def clean_styling_string(style):
+    # Any of the following delimiters can be used inside style. Internally, all are replaced with a colon.
+    delimiters = "~`!@#$%^&*-_=+\\/|;'<>,./?"
+    for delimiter in delimiters:
+        style = style.replace(delimiter, ":")
+    
+    # Lowercase any capital letters for case-insensitivity
+    style = style.lower()
+
+    # Style is split from a delimited string into an array of strings
+    if isinstance(style, str):
+        style = style.split(":")
+    style = [s for s in style if s!=""] # removes empty strings
+    style = list(set(style)) # removes duplicates
+    return style
 
 # Sorts, removes duplicates, converts to either floats or ints depending on precision, rounds off imprecision.
 def clean_list(listA, quiet=True):
@@ -724,17 +1082,6 @@ def read_cadence_values(read_csv_path, identification_string):
             listA.append(md[identification_string])
     return clean_list(listA) # converts to ints/float, sorts, filters
 
-# This was intended to determine whether a cadence or tree style format was passed. Would work well for current
-# implementation, but would likely cause problems after further development.
-# def read_constants(read_path, identification_string):
-#     if os.path.isdir(read_path):
-#         return read_tree_values(read_path, identification_string)
-#     elif (read_path[-4:] == ".csv"):
-#         return read_cadence_values(read_path, identification_string)
-#     else:
-#         print("File path does not point to a directory or a csv")
-#         return -1
-
 # Reads cadence metadata, compares to a pre-defined list of constants. Sorts/filters to be equivalent to those defined 
 # constants and produces a helpful blurb of text if something doesn't match.
 # Input: cadence-style csv's header cell, a list of constants for comparison, and details for outputting helpful error
@@ -749,10 +1096,10 @@ def match_metadata_to_defined_constants(header_cell, defined_constants, error_re
             print(f"The constant names in that cell are:")
             print_cadence_metadata_names(error_read_file_path, quiet)
             raise ValueError("See above")
-    sorted_constants = sorted(constants, key=lambda constant: defined_constants.index(constant["name"]))
-    filtered_constants = [constant for constant in sorted_constants if constant["name"] in defined_constants]
+    filtered_constants = [constant for constant in constants if constant["name"] in defined_constants]
+    sorted_constants = sorted(filtered_constants, key=lambda constant: defined_constants.index(constant["name"]))
     #print(f"Sorted/filtered: {filtered_constants}")
-    return filtered_constants
+    return sorted_constants
 
 # Strips metadata out of Cadence column name
 def remove_text_in_parentheses(string):
@@ -829,8 +1176,12 @@ def reformat(write_dir_name, read_file_path, write_file_name, constant_names_in_
                     print(f"Writing to {write_current}")
                 break
 
+#############################################################################
+########################## Especially this one!!! ###########################
+#############################################################################
+
 # Reads a cadence-style csv (sims) into a tree of dictionaries. Allows for shared sim/test plotting code.
-# To-Do: Functionality for multiple csv files at final branch
+# To-Do: Functionality for multiple csv files at final branch?
 def read_cadence_csv(read_file_path, constant_names_in_order="default", new_x_label="default", 
                      new_y_label="default", quiet=True):
     df = pd.read_csv(read_file_path)
@@ -889,7 +1240,7 @@ def read_cadence_csv(read_file_path, constant_names_in_order="default", new_x_la
         values_list.append(all_values[constant_name])
         print(f"Layer {i} of keys for {constant_name}: {all_values[constant_name]}")
         i = i+1
-    print(f"Final dataframe columns: [{new_x_label}, {new_y_label}]\n")
+    print(f"Final dataframe columns: ['{new_x_label}', '{new_y_label}']\n")
     return data, values_list
 
 # This is considered bad practice. I don't care too much. Definitely ugly though.
@@ -1041,17 +1392,3 @@ def read_tree_csv_recursion(current_dir, remaining_names_in_order, file_identifi
                     final_column_values.append(column)
     current_values[name] = clean_list(current_values[name], quiet)
     return current_data, current_values, final_column_values
-
-# Can read either a tree of directories or a cadence-style csv. This one seems like a bad idea if I make 
-# read_cadence_csv() capable of reading in multiple files at once (and thus being callable on a dir)
-# def read_csv(read_path, constant_names_in_order, new_x_label="default", new_y_label="default", 
-#              tree_file_identifier="default", quiet=True):
-#     if not os.path.exists(read_path):
-#         raise ValueError("Path does not exist")
-#     elif os.path.isdir(read_path):
-#         return read_tree_csv(read_path, constant_names_in_order, tree_file_identifier, quiet)
-#     elif (read_path[-4:] == ".csv"):
-#         return read_cadence_csv(read_path, constant_names_in_order, new_x_label, new_y_label, quiet)
-#     else:
-#         raise ValueError("File path does not point to a directory or a csv.")
-    
