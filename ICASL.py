@@ -662,6 +662,25 @@ def generate_experiment_name(run_type, local_temps, device_name, info = ""):
     return run_dir
     # If the directory already exists, it won't raise an error due to exist_ok=True
 
+def remove_attribute(run_dir, remove_attribute):
+    # Removes string from a string. Assumes the string is surrounded by square brackets. Designed for my [attribute] naming convention.
+    # Primarily used to remove the attribute "No_Plots" from the names of run directories once plots are added.
+    try:
+        if not isinstance(remove_attribute, str): remove_attribute = str(remove_attribute)
+        if remove_attribute[0] == "[": remove_attribute = remove_attribute[1:]
+        if remove_attribute[-1] == "]": remove_attribute = remove_attribute[0:-1]
+        if f"[{remove_attribute}]" in run_dir:
+            new_run_dir = run_dir.replace(f"[{remove_attribute}]", "")
+            if new_run_dir[-1] == "_":
+                new_run_dir = new_run_dir[0:-1]
+            os.rename(run_dir, new_run_dir)
+            run_dir = new_run_dir
+            return run_dir
+    except PermissionError:
+        # Operating System might get mad if you have the directory open and try to rename. This simply moves on if it does.
+        pass
+
+# Identical to the previous function -- left here for backwards compatibility.
 def rename_dir_once_plotted(run_dir, remove_attribute):
     # Changes name of run directory once some plots are in it.
     try:
