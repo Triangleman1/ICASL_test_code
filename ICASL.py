@@ -653,7 +653,7 @@ def generate_experiment_name(run_type, local_temps, device_name, info = ""):
         descriptors.append(f"{local_temps}°C")    # Adds temperature if there's only one (such as a practice run)
     elif len(local_temps) == 1:
         descriptors.append(f"{local_temps[0]}°C")
-    descriptors.append("No_Plots")
+    descriptors.append("No_Data")
     if isinstance(info, str) and info != "":      # Adds extra info if desired
         descriptors.append(f"{info}")
     for descriptor in descriptors:
