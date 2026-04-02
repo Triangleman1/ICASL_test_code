@@ -101,9 +101,15 @@ import collections                # I use this to check whether input to a funct
 import matplotlib.legend as lg    # I use this to check whether input to a function is a matplotlib legend
 from datetime import date         # Read current date
 from matplotlib.ticker import MultipleLocator, LogLocator # Used for ticks in linear and logarithmic plots
+import winsound                   # Custom beeps/noises
 
 def test():
     print("ICASL is loaded!")
+
+def beep():
+    frequency = 900 # Hz
+    duration = 400  # Milliseconds
+    winsound.Beep(frequency, duration)
 
 # Performs numpy's arange() function (which generates a list of numbers from a start, stop, and step)
 # The returned list will include the 'stop' value, which numpy usually excludes
