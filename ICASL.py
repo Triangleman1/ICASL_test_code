@@ -100,7 +100,9 @@ import math                       # Does math
 import collections                # I use this to check whether input to a function is a collection (list,array,etc.)
 import matplotlib.legend as lg    # I use this to check whether input to a function is a matplotlib legend
 from datetime import date         # Read current date
-from matplotlib.ticker import MultipleLocator, LogLocator # Used for ticks in linear and logarithmic plots
+from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import LogLocator            # Used for ticks in logarithmic plots
+from matplotlib.ticker import ScalarFormatter       # Used for ticks in linear plots
 import winsound                   # Custom beeps/noises
 
 def test():
@@ -392,6 +394,13 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
     if (close):
         plt.close(fig) # Saves memory, gets rid of warnings.
 
+# Disables scaling and offsets in axis tick values
+def disable_scaling_and_offset(ax):
+    formatter = ScalarFormatter(useOffset=False)
+    formatter.set_scientific(False) # Optional: disable 1eN notation
+    ax.yaxis.set_major_formatter(formatter)
+    return ax
+
 ##########################################################################################################################
 ##################################################### Plotting Calcs #####################################################
 ##########################################################################################################################
@@ -425,6 +434,7 @@ def tran_peak(times, values, settling_direction, log=False):
 
 # Determines coordinates where transient is officially settled
 # Limit data to only show one transient step response before calling
+# WARNING: I reference this from the peak -- I don't think this was right. Should probably be from the initial value.
 def tran_settle(times, values, peak_value, percent_settling_threshold, log=False):
     times=convert_to_numpy(times)
     values=convert_to_numpy(values)
@@ -524,6 +534,40 @@ def calc_crossover_freq(freqs, gains):
     zero_gain = find_closest(gains, 0)
     crossover_freq = freqs[gains == zero_gain]
     return crossover_freq
+
+# Assumes data is limited to only show one transient step response before calling. The "initial" time is
+# coordinates of the point where the transient begins -- make sure you choose this point correctly.
+def calc_time_constant(times, values, initial_time, log=False):
+    times = convert_to_numpy(times)
+    values = convert_to_numpy(values)
+
+    initial_time_index = np.where(times == initial_time)[0][0]
+    initial_value = values[initial_time_index]
+
+    settled_value = np.mean(values[-3:-1])
+    
+    if settled_value > initial_value: direction = "up"
+    elif settled_value < initial_value: direction = "down"
+    else: raise ValueError("Settled value is the same as initial value)")
+
+    target_value = 0.632 * (settled_value - initial_value) + initial_value
+    if direction=="up":
+        crossing_index = np.where(values >= target_value)[0][0]
+    elif direction=="down":
+        crossing_index = np.where(values <= target_value)[0][0]
+    else:
+        raise ValueError("'direction' must be 'up' or 'down'")
+    crossing_time = times[crossing_index]
+    crossing_value = values[crossing_index]
+
+    if log:
+        print(f"Initial time: {initial_time}, Initial value: {initial_value}")
+        print(f"Target value: {target_value} (63.2%)")
+        print(f"Settled time: {times[-2]}, Settled value: {settled_value}")
+        print(f"Crossing time: {crossing_time}, Crossing value: {crossing_value}")
+
+    time_constant = crossing_time - initial_time
+    return time_constant
 
 ###########################################################################################################################
 ################################################## Plotting Presentation ##################################################
@@ -1258,6 +1302,7 @@ suggested_file_IDs = False
 def read_tree_csv(read_dir_path, constant_names_in_order, file_identifier="default", quiet=True):
     if file_identifier == "default":
         print("Warning: Unless there's only one .csv to choose, you need a tree_file_identifier=")
+        # TODO: Check if there's only one .csv to choose
     read_tree_names(read_dir_path)
 
     current_dir = read_dir_path
@@ -1361,7 +1406,10 @@ def read_tree_csv_recursion(current_dir, remaining_names_in_order, file_identifi
             if not quiet: print("No file identifier provided, and more than one available csv. " +
                                 "Returning without reading data.")
             return None, None, None
-        files = [file for file in os.listdir(current_dir) if file_identifier in file and name in file and ".csv" in file]
+        elif file_identifier == "default":
+            files = [file for file in os.listdir(current_dir) if name in file and ".csv" in file]
+        else:
+            files = [file for file in os.listdir(current_dir) if file_identifier in file and name in file and ".csv" in file]
         if len(files) == 0:
             global suggested_file_IDs
             print(f"Warning: Found no files with {file_identifier}, {name}, and .csv in the last directory, {current_dir}")
