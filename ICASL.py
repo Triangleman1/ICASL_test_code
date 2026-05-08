@@ -1045,7 +1045,7 @@ def read_tree_names(read_dir_path, split_strategy="default", quiet=True):
                         pass
                     elif (split_strategy == "b"):
                         # Assume the variable name is separated by an underscore, and has no underscores in the middle.
-                        if not quiet: print(f"Found _ at index {constant_name.rfind("_")}")
+                        if not quiet: print(f"Found _ at index {constant_name.rfind('_')}")
                         new_index = (len(constant_name)-constant_name.rfind("_"))*-1
                         if new_index > index:
                             constant_name = constant_name[new_index:]
