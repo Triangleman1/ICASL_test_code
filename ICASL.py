@@ -815,7 +815,7 @@ def clean_list(listA, quiet=True):
     listA = convert_to_num(listA) # Convert to int/float
     listA = list(set(listA)) # Removes duplicates
     listA = sorted(listA) # Sorts
-    listA = [round(element, 12) for element in listA]
+    #listA = [round(element, 12) for element in listA]
     return listA
 
 # Similar to clean_list(), but designed for string inputs and string outputs.
