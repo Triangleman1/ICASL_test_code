@@ -126,7 +126,7 @@ class BatteryEKF:
             self.Q = np.diag([1e-7, 1e-6, 1e-6])
         else:
             self.R = 1e-2  # during discharge, trust voltage less
-            self.Q = np.diag([1e-2, 1e-7, 1e-7])
+            self.Q = np.diag([1e-3, 1e-7, 1e-7])
         soc_val = self.x[0, 0]
 
 
