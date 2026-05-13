@@ -1,5 +1,6 @@
 import numpy as np               # Importing numpy for numerical operations, particularly with arrays
 import pandas as pd              # Importing pandas as pd for data manipulation and analysis
+from scipy.interpolate import make_interp_spline    # Interpolation of data points
 class BatteryEKF:
     def __init__(self, df_charge, df_discharge, Capacity):
         # Extract LUTs from the dataframes
@@ -17,12 +18,26 @@ class BatteryEKF:
         self.r2_discharge_lut = df_discharge["R2"].values
         self.c2_discharge_lut = df_discharge["C2"].values
 
+        extrapolate = True
+
+        self.r0_charge_spline = make_interp_spline(self.soc_charge_lut, self.r0_charge_lut, k=1) ; self.r0_charge_spline.extrapolate = extrapolate
+        self.r1_charge_spline = make_interp_spline(self.soc_charge_lut, self.r1_charge_lut, k=1) ; self.r1_charge_spline.extrapolate = extrapolate
+        self.c1_charge_spline = make_interp_spline(self.soc_charge_lut, self.c1_charge_lut, k=1) ; self.c1_charge_spline.extrapolate = extrapolate
+        self.r2_charge_spline = make_interp_spline(self.soc_charge_lut, self.r2_charge_lut, k=1) ; self.r2_charge_spline.extrapolate = extrapolate
+        self.c2_charge_spline = make_interp_spline(self.soc_charge_lut, self.c2_charge_lut, k=1) ; self.c2_charge_spline.extrapolate = extrapolate
+
+        self.r0_discharge_spline = make_interp_spline(self.soc_discharge_lut, self.r0_discharge_lut, k=1) ; self.r0_discharge_spline.extrapolate = extrapolate
+        self.r1_discharge_spline = make_interp_spline(self.soc_discharge_lut, self.r1_discharge_lut, k=1) ; self.r1_discharge_spline.extrapolate = extrapolate
+        self.c1_discharge_spline = make_interp_spline(self.soc_discharge_lut, self.c1_discharge_lut, k=1) ; self.c1_discharge_spline.extrapolate = extrapolate
+        self.r2_discharge_spline = make_interp_spline(self.soc_discharge_lut, self.r2_discharge_lut, k=1) ; self.r2_discharge_spline.extrapolate = extrapolate
+        self.c2_discharge_spline = make_interp_spline(self.soc_discharge_lut, self.c2_discharge_lut, k=1) ; self.c2_discharge_spline.extrapolate = extrapolate
+
         self.Q_cap = Capacity * 3600 # Ah to Ampere-seconds
         self.p_charge = np.poly1d(np.polyfit(self.soc_charge_lut, df_charge["OCV"].values, 5))
         self.p_charge_derivative = np.polyder(self.p_charge)
         self.p_discharge = np.poly1d(np.polyfit(self.soc_discharge_lut, df_discharge["OCV"].values, 5))
         self.p_discharge_derivative = np.polyder(self.p_discharge)
-
+        self.v_predicted = 0.0
 
         # State: [SOC, Vc1, Vc2]
         self.x = np.array([[1.0], [0.0], [0.0]]) 
@@ -30,7 +45,8 @@ class BatteryEKF:
         self.charge_state = 'discharging'
         
         # Process noise usually scales with time, but keeping it simple for now
-        self.Q = np.diag([1e-3, 1e-7, 1e-7]) 
+        #self.Q = np.diag([1e-3, 1e-7, 1e-7])
+        self.Q = np.diag([1e-3, 1e-3, 1e-3])
         self.R = 1e-5
 
         self.voltage_history = []
@@ -39,11 +55,13 @@ class BatteryEKF:
         self.is_fully_charged = False
 
     def update_charge_state(self, current, threshold=0.05):
+        r0, r1, c1, r2, c2 = self.get_parameters()
+
         # Only update state when current is significant
         # During rest (current ≈ 0), state is preserved from last active period
-        if -current > threshold:
+        if -current > threshold and self.charge_state != 'charging':
             self.charge_state = 'charging'
-        elif -current < -threshold:
+        elif -current < -threshold and self.charge_state != 'discharging':
             self.charge_state = 'discharging'
 
     def initialize_soc(self, measured_voltage, soc_points, ocv_points):
@@ -57,23 +75,37 @@ class BatteryEKF:
         # Update the state vector
         self.x[0, 0] = initial_soc
         return initial_soc
+    
     def get_parameters(self):
         current_soc = np.clip(self.x[0, 0], 0, 1)
         
-        # Interpolate each parameter based on current SOC
+        #Interpolate each parameter based on current SOC
         if self.charge_state == 'charging':  # charging LUTs
-            r0 = np.interp(current_soc, self.soc_charge_lut, self.r0_charge_lut)
-            r1 = np.interp(current_soc, self.soc_charge_lut, self.r1_charge_lut)
-            c1 = np.interp(current_soc, self.soc_charge_lut, self.c1_charge_lut)
-            r2 = np.interp(current_soc, self.soc_charge_lut, self.r2_charge_lut)
-            c2 = np.interp(current_soc, self.soc_charge_lut, self.c2_charge_lut)
+            r0 = self.r0_charge_spline(current_soc)
+            r1 = self.r1_charge_spline(current_soc)
+            c1 = self.c1_charge_spline(current_soc)
+            r2 = self.r2_charge_spline(current_soc)
+            c2 = self.c2_charge_spline(current_soc)
         else:  # discharging LUTs
-            r0 = np.interp(current_soc, self.soc_discharge_lut, self.r0_discharge_lut)
-            r1 = np.interp(current_soc, self.soc_discharge_lut, self.r1_discharge_lut)
-            c1 = np.interp(current_soc, self.soc_discharge_lut, self.c1_discharge_lut)
-            r2 = np.interp(current_soc, self.soc_discharge_lut, self.r2_discharge_lut)
-            c2 = np.interp(current_soc, self.soc_discharge_lut, self.c2_discharge_lut)
-            
+            r0 = self.r0_discharge_spline(current_soc)
+            r1 = self.r1_discharge_spline(current_soc)
+            c1 = self.c1_discharge_spline(current_soc)
+            r2 = self.r2_discharge_spline(current_soc)
+            c2 = self.c2_discharge_spline(current_soc)
+
+        # if self.charge_state == 'charging':  # charging LUTs
+        #     r0 = np.interp(current_soc, self.soc_charge_lut, self.r0_charge_lut)
+        #     r1 = np.interp(current_soc, self.soc_charge_lut, self.r1_charge_lut)
+        #     c1 = np.interp(current_soc, self.soc_charge_lut, self.c1_charge_lut)
+        #     r2 = np.interp(current_soc, self.soc_charge_lut, self.r2_charge_lut)
+        #     c2 = np.interp(current_soc, self.soc_charge_lut, self.c2_charge_lut)
+        # else:  # discharging LUTs
+        #     r0 = np.interp(current_soc, self.soc_discharge_lut, self.r0_discharge_lut)
+        #     r1 = np.interp(current_soc, self.soc_discharge_lut, self.r1_discharge_lut)
+        #     c1 = np.interp(current_soc, self.soc_discharge_lut, self.c1_discharge_lut)
+        #     r2 = np.interp(current_soc, self.soc_discharge_lut, self.r2_discharge_lut)
+        #     c2 = np.interp(current_soc, self.soc_discharge_lut, self.c2_discharge_lut)
+
         return r0, r1, c1, r2, c2
     def get_OCV(self, soc):
         # Ensure SOC stays in bounds [0, 1]
@@ -95,18 +127,23 @@ class BatteryEKF:
     def predict(self, current, dt):
         # Fetch dynamic parameters for the current SOC
         r0, r1, c1, r2, c2 = self.get_parameters()
-        
         exp1 = np.exp(-dt / (r1 * c1))
         exp2 = np.exp(-dt / (r2 * c2))
         
         A = np.array([[1, 0, 0], [0, exp1, 0], [0, 0, exp2]])
         B = np.array([[-dt / self.Q_cap], [r1 * (1 - exp1)], [r2 * (1 - exp2)]])
         
+        # print(f"A: {A}")
+        # print(f"self.x: {self.x}")
+        # print(f"B: {B}")
+        # print(f"current: {current}")
+        # print(f"A @ self.x: {A @ self.x}")
+
         self.x = A @ self.x + B * current
         lambda_factor = 1.001  # small forgetting factor
         self.P = lambda_factor * (A @ self.P @ A.T) + (self.Q * dt)
         if self.charge_state == 'charging':  # charging
-                self.x[0, 0] = np.clip(self.x[0, 0], 0, 1.05)  # allow slight overcharge
+            self.x[0, 0] = np.clip(self.x[0, 0], 0, 1.05)  # allow slight overcharge
         else:
             self.x[0, 0] = np.clip(self.x[0, 0], 0, 1.0)
 
@@ -126,11 +163,10 @@ class BatteryEKF:
             self.Q = np.diag([1e-7, 1e-6, 1e-6])
         else:
             self.R = 1e-2  # during discharge, trust voltage less
-            self.Q = np.diag([1e-3, 1e-7, 1e-7])
+            self.Q = np.diag([1e-3, 1e-6, 1e-6])
         soc_val = self.x[0, 0]
 
-
-        v_predicted = self.get_OCV(soc_val) - current * r0 - self.x[1, 0] - self.x[2, 0]
+        self.v_predicted = self.get_OCV(soc_val) - current * r0 - self.x[1, 0] - self.x[2, 0]
 
         r0, r1, c1, r2, c2 = self.get_parameters()
 
@@ -142,10 +178,12 @@ class BatteryEKF:
         K = self.P @ H.T @ np.linalg.inv(S)
         
         # 5. Update State and Covariance
-        innovation = measured_voltage - v_predicted
+        innovation = measured_voltage - self.v_predicted
         self.x = self.x + K * innovation
         self.P = (np.eye(3) - K @ H) @ self.P
-        self.check_full_charge(measured_voltage, current)
+        # self.x[1,0] = np.clip(self.x[1, 0], -2*current*r1, 2*current*r1)
+        # self.x[2,0] = np.clip(self.x[2, 0], -2*current*r2, current*r2)
+        #self.check_full_charge(measured_voltage, current)
         return self.x[0, 0] # Return estimated SOC
 
     def check_full_charge(self, voltage, current):
