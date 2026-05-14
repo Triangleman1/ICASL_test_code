@@ -41,7 +41,7 @@ class BatteryEKF:
 
         # State: [SOC, Vc1, Vc2]
         self.x = np.array([[1.0], [0.0], [0.0]]) 
-        self.P = np.eye(3) * .001
+        self.P = np.diag([1e-4, 1e-2, 1e-2])
         self.charge_state = 'discharging'
         
         # Process noise usually scales with time, but keeping it simple for now
@@ -149,7 +149,7 @@ class BatteryEKF:
 
         # self.P = A @ self.P @ A.T + (self.Q * dt)
 
-    def update(self, measured_voltage, current, rest_duration):
+    def update(self, measured_voltage, current, rest_duration, dt, cr=True):
         # 2. Observation (h)
         # Vt = OCV(SOC) - I*R0 - Vc1 - Vc2
         self.update_charge_state(current)
@@ -159,11 +159,11 @@ class BatteryEKF:
             # Fraction of relaxation complete (0=just stopped, 1=fully relaxed)
             relaxation = 1 - np.exp(-rest_duration / (r1 * c1))
             # Scale measurement trust by how relaxed it is
-            self.R = 1e-3 / (relaxation + 1e-3)  # high R when unrelaxed, low when relaxed
-            self.Q = np.diag([1e-7, 1e-6, 1e-6])
+            self.R = 1e-2 / (relaxation + 1e-2)  # high R when unrelaxed, low when relaxed
+            self.Q = np.diag([1e-7, 1e-5, 1e-5])
         else:
-            self.R = 1e-2  # during discharge, trust voltage less
-            self.Q = np.diag([1e-3, 1e-6, 1e-6])
+            self.R = 1e-1  # during discharge, trust voltage less
+            self.Q = np.diag([1e-3, 1e-5, 1e-5])
         soc_val = self.x[0, 0]
 
         self.v_predicted = self.get_OCV(soc_val) - current * r0 - self.x[1, 0] - self.x[2, 0]
@@ -179,7 +179,12 @@ class BatteryEKF:
         
         # 5. Update State and Covariance
         innovation = measured_voltage - self.v_predicted
-        self.x = self.x + K * innovation
+        change = K * innovation
+        SOC_rate = change[0][0]/dt
+        clamped_SOC_rate = np.clip(SOC_rate, -0.1/50, 0.1/50)  # Limit SOC correction to prevent wild swings
+        if (cr):
+            change[0][0] = change[0][0] * (clamped_SOC_rate / SOC_rate)
+        self.x = self.x + change
         self.P = (np.eye(3) - K @ H) @ self.P
         # self.x[1,0] = np.clip(self.x[1, 0], -2*current*r1, 2*current*r1)
         # self.x[2,0] = np.clip(self.x[2, 0], -2*current*r2, current*r2)
