@@ -1,4 +1,0 @@
-Our frequency counter has an extra digit of precision compared to our oscilloscope, but cannot interface with equipment. Data must be collected manually. For this test:
-
-After applying heat and settling: 50.00165 MHz
-After deactivating heat and settling: 50.00378 MHz
