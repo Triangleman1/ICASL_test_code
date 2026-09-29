@@ -771,6 +771,9 @@ def convert_to_num(input):
         elif (determine_precision(input) > 0):
             return [float(element) for element in input]
     elif isinstance(input, int) or isinstance(input, float) or isinstance(input, str):
+        if (isinstance(input, str)):
+            if (input[-1] == "."):
+                input = input[0:-1] # Removes trailing decimal point, which would throw an error when converting to int
         if (determine_precision(input) == 0):
             return int(input)
         elif (determine_precision(input) > 0):
