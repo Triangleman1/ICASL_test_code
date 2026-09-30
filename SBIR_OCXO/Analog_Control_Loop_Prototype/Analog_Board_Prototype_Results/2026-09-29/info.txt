@@ -1,0 +1,6 @@
+For Temperature_Sweep_2 (Heat_stays_on):
+Soak time of 5 minutes. Set_precision of 2.5 C. 
+Did not fully settle -- should restrict these when transitioning chamber temperature
+
+For Single_Temperature (Heat_on_off):
+Soak time of ~8 minutes. Outputs of power supply turned off beforehand, then on at end of soak time. (Cold start!)
