@@ -256,7 +256,8 @@ def add_legend_text(legend, text):
 # Adding colors afterwards is nice - don't need to know the number beforehand. Completely abstracted away.
 # Legend_style is searched for 1-2 character sequences to determine how to construct the legend. Need to add delimiter eventually.
 def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_cmap('gist_rainbow'), 
-                legend=None, legend_title=None, legend_style="default", annotations=None, close=True, show=False, save=True):
+                legend=None, legend_title=None, legend_style="default", annotations=None, 
+                close=True, show=False, save=True, tighten=False):
     
     # Sets legend_style to a default styling if requested
     default_style = "k:c"
@@ -382,7 +383,10 @@ def finish_plot(fig, ax, save_dir="none", save_file="none", dpi=100, cm=plt.get_
     elif (save_dir != "none" and save_file != "none"):
         os.makedirs(save_dir, exist_ok=True)
         if os.path.isdir(save_dir):
-            fig.savefig(os.path.join(save_dir, save_file), dpi=dpi)
+            if (tighten):
+                fig.savefig(os.path.join(save_dir, save_file), dpi=dpi, bbox_inches='tight')
+            else:
+                fig.savefig(os.path.join(save_dir, save_file), dpi=dpi)
         else:
             raise ValueError("Directory provided ({save_dir}) does not exist. Figure not saved.")
     else:
@@ -957,7 +961,8 @@ def read_tree_names(read_dir_path, split_strategy="default", quiet=True):
     file_identifiers = []
     while(True):
         name_counts = {}
-        # Find names that precede numbers in file names throughout directory. Count quantity of each
+        parameter_name_not_found = False
+        # Find names that precede numbers in file names throughout directory (Names of tests). Count quantity of each
         relevant_names = [file_name for file_name in os.listdir(current_dir) 
                           if (os.path.isdir(os.path.join(current_dir, file_name)) or file_name[-4:] == ".csv")]
         if (quiet == False): print(f"Relevant names: {relevant_names}")
@@ -974,6 +979,10 @@ def read_tree_names(read_dir_path, split_strategy="default", quiet=True):
                 else:
                     name_counts[name] = name_counts[name]+1
         if (quiet == False): print(f"Name counts: {name_counts}")
+        if not name_counts:
+            raise ValueError(f"Could not find any swept parameters in {current_dir}. (i.e. 'temp=25').\n" +
+                             f"read_tree_names should only be used on multi-dimensional data where swept \n" +
+                             f"parameter values appear in file/folder names.")
         # Find the name that appears most
         blacklist = []
         while(True):
@@ -1306,7 +1315,7 @@ def read_tree_csv(read_dir_path, constant_names_in_order, file_identifier="defau
     if file_identifier == "default":
         print("Warning: Unless there's only one .csv to choose, you need a tree_file_identifier=")
         # TODO: Check if there's only one .csv to choose
-    read_tree_names(read_dir_path)
+    read_tree_names(read_dir_path, quiet=quiet)
 
     current_dir = read_dir_path
     global suggested_names
